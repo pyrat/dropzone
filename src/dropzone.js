@@ -64,7 +64,9 @@ export default class Dropzone extends Emitter {
 
     // make sure we actually have an HTML Element
     if (this.element === null || !this.element instanceof HTMLElement) {
-      throw new Error("Invalid dropzone element: not an instance of HTMLElement.");
+      throw new Error(
+        "Invalid dropzone element: not an instance of HTMLElement."
+      );
     }
 
     if (this.element.dropzone) {
@@ -880,7 +882,15 @@ export default class Dropzone extends Emitter {
     );
   }
 
-  createThumbnail(file, width, height, resizeMethod, fixOrientation, callback, ignoreExif = false) {
+  createThumbnail(
+    file,
+    width,
+    height,
+    resizeMethod,
+    fixOrientation,
+    callback,
+    ignoreExif = false
+  ) {
     let fileReader = new FileReader();
 
     fileReader.onload = () => {
@@ -902,7 +912,7 @@ export default class Dropzone extends Emitter {
         fixOrientation,
         callback,
         undefined,
-        ignoreExif,
+        ignoreExif
       );
     };
 
@@ -955,7 +965,7 @@ export default class Dropzone extends Emitter {
     fixOrientation,
     callback,
     crossOrigin,
-    ignoreExif = false,
+    ignoreExif = false
   ) {
     // Not using `new Image` here because of a bug in latest Chrome versions.
     // See https://github.com/enyo/dropzone/pull/226
@@ -1070,7 +1080,7 @@ export default class Dropzone extends Emitter {
 
     var dataURL = file.dataURL;
     if (ignoreExif) {
-       dataURL = removeExif(dataURL);
+      dataURL = removeExif(dataURL);
     }
 
     return (img.src = dataURL);
@@ -1279,7 +1289,9 @@ export default class Dropzone extends Emitter {
         if (this.options.parallelChunkUploads) {
           // we want to limit parallelChunkUploads to the same value as parallelUploads option
           const parallelCount = Math.min(
-            this.options.parallelChunkUploads === true ? this.options.parallelUploads : this.options.parallelChunkUploads,
+            this.options.parallelChunkUploads === true
+              ? this.options.parallelUploads
+              : this.options.parallelChunkUploads,
             file.upload.totalChunkCount
           );
           for (let i = 0; i < parallelCount; i++) {
@@ -1314,138 +1326,9 @@ export default class Dropzone extends Emitter {
     }
   }
 
-  // This function actually uploads the file(s) to the server.
-  //
-  //  If dataBlocks contains the actual data to upload (meaning, that this could
-  // either be transformed files, or individual chunks for chunked upload) then
-  // they will be used for the actual data to upload.
+  // This is a hack to not actually upload anything, but do it afterwards.
   _uploadData(files, dataBlocks) {
-    let xhr = new XMLHttpRequest();
-
-    // Put the xhr object in the file objects to be able to reference it later.
-    for (let file of files) {
-      file.xhr = xhr;
-    }
-    if (files[0].upload.chunked) {
-      // Put the xhr object in the right chunk object, so it can be associated
-      // later, and found with _getChunk.
-      files[0].upload.chunks[dataBlocks[0].chunkIndex].xhr = xhr;
-    }
-
-    let method = this.resolveOption(this.options.method, files, dataBlocks);
-    let url = this.resolveOption(this.options.url, files, dataBlocks);
-    xhr.open(method, url, true);
-
-    // Setting the timeout after open because of IE11 issue: https://gitlab.com/meno/dropzone/issues/8
-    let timeout = this.resolveOption(this.options.timeout, files);
-    if (timeout) xhr.timeout = this.resolveOption(this.options.timeout, files);
-
-    // Has to be after `.open()`. See https://github.com/enyo/dropzone/issues/179
-    xhr.withCredentials = !!this.options.withCredentials;
-
-    xhr.onload = (e) => {
-      this._finishedUploading(files, xhr, e);
-    };
-
-    xhr.ontimeout = () => {
-      this._handleUploadError(
-        files,
-        xhr,
-        `Request timedout after ${this.options.timeout / 1000} seconds`
-      );
-    };
-
-    xhr.onerror = () => {
-      this._handleUploadError(files, xhr);
-    };
-
-    // Some browsers do not have the .upload property
-    let progressObj = xhr.upload != null ? xhr.upload : xhr;
-    progressObj.onprogress = (e) =>
-      this._updateFilesUploadProgress(files, xhr, e);
-
-    let headers = this.options.defaultHeaders
-      ? {
-          Accept: "application/json",
-          "Cache-Control": "no-cache",
-          "X-Requested-With": "XMLHttpRequest",
-        }
-      : {};
-
-    if (this.options.binaryBody) {
-      headers["Content-Type"] = files[0].type;
-    }
-
-    if (this.options.headers) {
-      Object.assign(headers, this.options.headers);
-    }
-
-    for (let headerName in headers) {
-      let headerValue = headers[headerName];
-      if (headerValue) {
-        xhr.setRequestHeader(headerName, headerValue);
-      }
-    }
-
-    if (this.options.binaryBody) {
-      // Since the file is going to be sent as binary body, it doesn't make
-      // any sense to generate `FormData` for it.
-      for (let file of files) {
-        this.emit("sending", file, xhr);
-      }
-      if (this.options.uploadMultiple) {
-        this.emit("sendingmultiple", files, xhr);
-      }
-      this.submitRequest(xhr, null, files);
-    } else {
-      let formData = new FormData();
-
-      // Adding all @options parameters
-      if (this.options.params) {
-        let additionalParams = this.options.params;
-        if (typeof additionalParams === "function") {
-          additionalParams = additionalParams.call(
-            this,
-            files,
-            xhr,
-            files[0].upload.chunked ? this._getChunk(files[0], xhr) : null
-          );
-        }
-
-        for (let key in additionalParams) {
-          let value = additionalParams[key];
-          if (Array.isArray(value)) {
-            // The additional parameter contains an array,
-            // so lets iterate over it to attach each value
-            // individually.
-            for (let i = 0; i < value.length; i++) {
-              formData.append(key, value[i]);
-            }
-          } else {
-            formData.append(key, value);
-          }
-        }
-      }
-
-      // Let the user add additional data if necessary
-      for (let file of files) {
-        this.emit("sending", file, xhr, formData);
-      }
-      if (this.options.uploadMultiple) {
-        this.emit("sendingmultiple", files, xhr, formData);
-      }
-
-      this._addFormElementData(formData);
-
-      // Finally add the files
-      // Has to be last because some servers (eg: S3) expect the file to be the last parameter
-      for (let i = 0; i < dataBlocks.length; i++) {
-        let dataBlock = dataBlocks[i];
-        formData.append(dataBlock.name, dataBlock.data, dataBlock.filename);
-      }
-
-      this.submitRequest(xhr, formData, files);
-    }
+    this._finished(files, "fakeok", null);
   }
 
   // Transforms all files with this.options.transformFile and invokes done with the transformed files when done.
@@ -1577,49 +1460,6 @@ export default class Dropzone extends Emitter {
     }
   }
 
-  _finishedUploading(files, xhr, e) {
-    let response;
-
-    if (files[0].status === Dropzone.CANCELED) {
-      return;
-    }
-
-    if (xhr.readyState !== 4) {
-      return;
-    }
-
-    if (xhr.responseType !== "arraybuffer" && xhr.responseType !== "blob") {
-      response = xhr.responseText;
-
-      if (
-        xhr.getResponseHeader("content-type") &&
-        ~xhr.getResponseHeader("content-type").indexOf("application/json")
-      ) {
-        try {
-          response = JSON.parse(response);
-        } catch (error) {
-          e = error;
-          response = "Invalid JSON response from server.";
-        }
-      }
-    }
-
-    this._updateFilesUploadProgress(files, xhr);
-
-    if (!(200 <= xhr.status && xhr.status < 300)) {
-      this._handleUploadError(files, xhr, response);
-    } else {
-      if (files[0].upload.chunked) {
-        files[0].upload.finishedChunkUpload(
-          this._getChunk(files[0], xhr),
-          response
-        );
-      } else {
-        this._finished(files, response, e);
-      }
-    }
-  }
-
   _handleUploadError(files, xhr, response) {
     if (files[0].status === Dropzone.CANCELED) {
       return;
@@ -1669,10 +1509,6 @@ export default class Dropzone extends Emitter {
       file.status = Dropzone.SUCCESS;
       this.emit("success", file, responseText, e);
       this.emit("complete", file);
-    }
-    if (this.options.uploadMultiple) {
-      this.emit("successmultiple", files, responseText, e);
-      this.emit("completemultiple", files);
     }
 
     if (this.options.autoProcessQueue) {
@@ -2007,100 +1843,101 @@ var drawImageIOSFix = function (ctx, img, sx, sy, sw, sh, dx, dy, dw, dh) {
 // Source: http://www.perry.cz/files/ExifRestorer.js
 // http://elicon.blog57.fc2.com/blog-entry-206.html
 function removeExif(origFileBase64) {
+  var marker = "data:image/jpeg;base64,";
 
-   var marker = 'data:image/jpeg;base64,';
+  if (!origFileBase64.startsWith(marker)) {
+    return origFileBase64;
+  }
 
-   if (!origFileBase64.startsWith(marker)) {
-      return origFileBase64;
-   }
+  var origFile = window.atob(origFileBase64.slice(marker.length));
 
-   var origFile = window.atob(origFileBase64.slice(marker.length));
+  if (!origFile.startsWith("\xFF\xD8\xFF")) {
+    return origFileBase64;
+  }
 
-   if (!origFile.startsWith("\xFF\xD8\xFF")) {
-      return origFileBase64;
-   }
+  // loop through the JPEG file segments and copy all but Exif segments into the filtered file.
+  var head = 0;
+  var filteredFile = "";
+  while (head < origFile.length) {
+    if (origFile.slice(head, head + 2) == "\xFF\xDA") {
+      // this is the start of the image data, we don't expect exif data after that.
+      filteredFile += origFile.slice(head);
+      break;
+    } else if (origFile.slice(head, head + 2) == "\xFF\xD8") {
+      // this is the global start marker.
+      filteredFile += origFile.slice(head, head + 2);
+      head += 2;
+    } else {
+      // we have a segment of variable size.
+      var length =
+        origFile.charCodeAt(head + 2) * 256 + origFile.charCodeAt(head + 3);
+      var endPoint = head + length + 2;
+      var segment = origFile.slice(head, endPoint);
+      if (!segment.startsWith("\xFF\xE1")) {
+        filteredFile += segment;
+      }
+      head = endPoint;
+    }
+  }
 
-   // loop through the JPEG file segments and copy all but Exif segments into the filtered file.
-   var head = 0;
-   var filteredFile = "";
-   while (head < origFile.length) {
-
-     if (origFile.slice(head, head+2) == "\xFF\xDA") {
-       // this is the start of the image data, we don't expect exif data after that.
-       filteredFile += origFile.slice(head);
-       break;
-     } else if (origFile.slice(head, head+2) == "\xFF\xD8") {
-       // this is the global start marker.
-       filteredFile += origFile.slice(head, head+2);
-       head += 2;
-     } else {
-       // we have a segment of variable size.
-       var length = origFile.charCodeAt(head + 2) * 256 + origFile.charCodeAt(head + 3);
-       var endPoint = head + length + 2;
-       var segment = origFile.slice(head, endPoint);
-       if (!segment.startsWith("\xFF\xE1")) {
-         filteredFile += segment;
-       }
-       head = endPoint;
-     }
-   }
-
-   return marker + window.btoa(filteredFile);
+  return marker + window.btoa(filteredFile);
 }
 
 function restoreExif(origFileBase64, resizedFileBase64) {
+  var marker = "data:image/jpeg;base64,";
 
-   var marker = 'data:image/jpeg;base64,';
+  if (
+    !(origFileBase64.startsWith(marker) && resizedFileBase64.startsWith(marker))
+  ) {
+    return resizedFileBase64;
+  }
 
-   if (!(origFileBase64.startsWith(marker) && resizedFileBase64.startsWith(marker))) {
-      return resizedFileBase64;
-   }
+  var origFile = window.atob(origFileBase64.slice(marker.length));
 
-   var origFile = window.atob(origFileBase64.slice(marker.length));
+  if (!origFile.startsWith("\xFF\xD8\xFF")) {
+    return resizedFileBase64;
+  }
 
-   if (!origFile.startsWith("\xFF\xD8\xFF")) {
-      return resizedFileBase64;
-   }
+  // Go through the JPEG file segments one by one and collect any Exif segments we find.
+  var head = 0;
+  var exifData = "";
+  while (head < origFile.length) {
+    if (origFile.slice(head, head + 2) == "\xFF\xDA") {
+      // this is the start of the image data, we don't expect exif data after that.
+      break;
+    } else if (origFile.slice(head, head + 2) == "\xFF\xD8") {
+      // this is the global start marker.
+      head += 2;
+    } else {
+      // we have a segment of variable size.
+      var length =
+        origFile.charCodeAt(head + 2) * 256 + origFile.charCodeAt(head + 3);
+      var endPoint = head + length + 2;
+      var segment = origFile.slice(head, endPoint);
+      if (segment.startsWith("\xFF\xE1")) {
+        exifData += segment;
+      }
+      head = endPoint;
+    }
+  }
 
-   // Go through the JPEG file segments one by one and collect any Exif segments we find.
-   var head = 0;
-   var exifData = "";
-   while (head < origFile.length) {
+  if (exifData == "") {
+    return resizedFileBase64;
+  }
 
-     if (origFile.slice(head, head+2) == "\xFF\xDA") {
-       // this is the start of the image data, we don't expect exif data after that.
-       break;
-     } else if (origFile.slice(head, head+2) == "\xFF\xD8") {
-       // this is the global start marker.
-       head += 2;
-     } else {
-       // we have a segment of variable size.
-       var length = origFile.charCodeAt(head + 2) * 256 + origFile.charCodeAt(head + 3);
-       var endPoint = head + length + 2;
-       var segment = origFile.slice(head, endPoint);
-       if (segment.startsWith("\xFF\xE1")) {
-         exifData += segment;
-       }
-       head = endPoint;
-     }
+  var resizedFile = window.atob(resizedFileBase64.slice(marker.length));
 
-   }
+  if (!resizedFile.startsWith("\xFF\xD8\xFF")) {
+    return resizedFileBase64;
+  }
 
-   if (exifData == "") {
-      return resizedFileBase64;
-   }
+  // The first file segment is always header information so insert the Exif data as second segment.
+  var splitPoint =
+    4 + resizedFile.charCodeAt(4) * 256 + resizedFile.charCodeAt(5);
+  resizedFile =
+    resizedFile.slice(0, splitPoint) + exifData + resizedFile.slice(splitPoint);
 
-   var resizedFile = window.atob(resizedFileBase64.slice(marker.length));
-
-   if (!resizedFile.startsWith("\xFF\xD8\xFF")) {
-      return resizedFileBase64;
-   }
-
-   // The first file segment is always header information so insert the Exif data as second segment.
-   var splitPoint = 4 + resizedFile.charCodeAt(4) * 256 + resizedFile.charCodeAt(5)
-   resizedFile = resizedFile.slice(0, splitPoint) + exifData + resizedFile.slice(splitPoint);
-
-   return marker + window.btoa(resizedFile);
+  return marker + window.btoa(resizedFile);
 }
 
 function __guard__(value, transform) {
