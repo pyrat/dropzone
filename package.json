@@ -1,5 +1,5 @@
 {
-  "name": "@deltablot/dropzone",
+  "name": "@pyrat/dropzone",
   "version": "7.1.2",
   "description": "Handles drag and drop of files for you.",
   "keywords": [
@@ -33,8 +33,8 @@
   },
   "maintainers": [
     {
-      "name": "Nicolas CARPi",
-      "web": "https://www.deltablot.com"
+      "name": "Alastair Brunton",
+      "web": "https://github.com/pyrat"
     }
   ],
   "scripts": {
@@ -46,12 +46,12 @@
     "start-test-server": "node test/test-server.js"
   },
   "bugs": {
-    "url": "https://github.com/NicolasCARPi/dropzone/issues"
+    "url": "https://github.com/pyrat/dropzone/issues"
   },
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/NicolasCARPi/dropzone.git"
+    "url": "https://github.com/pyrat/dropzone.git"
   },
   "dependencies": {
     "@swc/helpers": "^0.5.9"
